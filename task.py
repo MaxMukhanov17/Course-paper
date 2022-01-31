@@ -66,12 +66,13 @@ class VKUser:
         self.download_photo(photos)
 
     def user_search(self):
-        url = "https://api.vk.com/method/users.search"
         type_command = int(input(
             'Введите команду:\n1 - если хотите ввести имя пользователя.'
-            '\n2 - если хотите ввести id пользователя.\n')
+            '\n2 - если хотите ввести id пользователя.'
+            '\n3 - если хотите ввести username(короткое имя профиля)\n')
         )
         if type_command == 1:
+            url = "https://api.vk.com/method/users.search"
             user_name = input('Введите имя и фамилию пользователя: ')
             user_birth_day = int(input('Введите день рождения пользователя: '))
             user_birth_month = int(input(
@@ -107,8 +108,25 @@ class VKUser:
                     self.photos_get(user_id)
             self.photos_get(user_name_id)
         elif type_command == 2:
-            user_id = int(input('Введите id пользователя: '))
+            user_id = input('Введите id пользователя: ')
             self.photos_get(user_id)
+        elif type_command == 3:
+            url_username = "https://api.vk.com/method/users.get"
+            username = input('Введите username(короткое имя профиля): ')
+            params_user_search = {'user_ids': username,
+                                  'fields': 'id',
+                                  }
+            response = requests.get(
+                url=url_username,
+                params={
+                    **self.params,
+                    **params_user_search
+                    }
+            )
+            user_info = response.json()['response']
+            for info in user_info:
+                user_id_username = info['id']
+                self.photos_get(user_id_username)
 
 
 class YaUploader:
@@ -121,11 +139,29 @@ class YaUploader:
             'Authorization': f'OAuth {self.token}'
         }
 
+    def create_folder(self):
+        create_url = "https://cloud-api.yandex.net/v1/disk/resources"
+        headers = self.get_headers()
+        params_get = {'path': '/'}
+        response = requests.get(
+            url=create_url,
+            headers=headers,
+            params=params_get
+        )
+        info_folders = response.json()['_embedded']['items']
+        for info_folder in info_folders:
+            name_folder = info_folder['name']
+            if name_folder == 'VK Photos':
+                continue
+            else:
+                params = {'path': '/VK Photos'}
+                requests.put(url=create_url, params=params, headers=headers)
+
     def get_upload_link(self, destination_path):
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
         headers = self.get_headers()
         params = {"path": destination_path, "overwrite": "true"}
-        response = requests.get(upload_url, headers=headers, params=params)
+        response = requests.get(url=upload_url, headers=headers, params=params)
         return response.json()
 
     def upload(self, file_path, destination_path):
@@ -147,6 +183,7 @@ if __name__ == '__main__':
     )
     for key, value in vk_client.dict_url_filename.items():
         bar.next()
-        uploader.upload(f'{value}', f'Курсовая. VK photos/{key}')
+        uploader.create_folder()
+        uploader.upload(f'{value}', f'VK Photos/{key}')
         time.sleep(1)
     bar.finish()
